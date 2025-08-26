@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 
 const fetchPartData = async (partNum) => {
-  // Always be resilient: network might fail or HTML may not contain what we expect.
   try {
     const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://parts.subaru.com/p/${partNum}`)}`;
     const res = await fetch(url);
@@ -9,22 +8,18 @@ const fetchPartData = async (partNum) => {
     const data = await res.json();
     const html = data?.contents || '';
 
-    // Try multiple strategies for name
     let name = 'Unknown Part';
-    let m = html.match(/<div[^>]*id=['"]partName['"][^>]*>(.*?)<\/div>/i)
-          || html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+    let m = html.match(/<div[^>]*id=['"]partName['"][^>]*>(.*?)<\/div>/i) || html.match(/<h1[^>]*>(.*?)<\/h1>/i);
     if (m && m[1]) name = m[1].replace(/<[^>]*>/g, '').trim();
 
-    // Category: look for breadcrumbs or labeled section
     let category = 'general';
     let bc = html.match(/breadcrumb[^>]*>(.*?)<\/(nav|div)>/i);
     if (bc && bc[1]) {
       const cleaned = bc[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
-      // Heuristic: pick the last non-generic word as category
       const guess = cleaned.split(' ').filter(Boolean).slice(-1)[0];
       if (guess && guess.length > 2) category = guess;
     }
-    // Map to one of our buckets if possible
+
     const buckets = [
       ['engine','engine','gasket','cylinder','oil'],
       ['interior','seat','console','dashboard','trim'],
@@ -34,12 +29,12 @@ const fetchPartData = async (partNum) => {
       ['transmission','transmission','clutch','gear'],
       ['brakes','brake','rotor','pad','caliper']
     ];
+
     const lowerName = name.toLowerCase();
-    for (const [bucket, *keys] of buckets) {
+    for (const [bucket, ...keys] of buckets) {
       if (keys.some(k => lowerName.includes(k))) { category = bucket; break; }
     }
 
-    // Price: first $… occurrence
     let price = 'N/A';
     const pm = html.match(/\$\s*[0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?/);
     if (pm) price = pm[0].replace(/\s+/g, '');
